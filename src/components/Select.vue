@@ -305,7 +305,7 @@
     <transition :name="transition">
       <ul ref="dropdownMenu" v-if="dropdownOpen" class="dropdown-menu" :style="{ 'max-height': maxHeight }">
         <li v-for="(option, index) in filteredOptions" v-bind:key="index" :class="{ active: isOptionSelected(option), highlight: index === typeAheadPointer }" @mouseover="typeAheadPointer = index">
-          <a @mousedown.prevent="select(option)">
+          <a @mousedown.prevent="select(option, index, $event)">
             {{ getOptionLabel(option) }}
           </a>
         </li>
@@ -525,7 +525,8 @@
         search: '',
         open: false,
         mutableValue: null,
-        mutableOptions: []
+        mutableOptions: [],
+        lastSelectedIndex: null,
       }
     },
 
@@ -605,24 +606,38 @@
        * @param  {Object|String} option
        * @return {void}
        */
-      select(option) {
+      select(option, index, $event) {
         if (this.isOptionSelected(option)) {
           this.deselect(option)
         } else {
+
           if (this.taggable && !this.optionExists(option)) {
             option = this.createOption(option)
           }
-
-          if (this.multiple && !this.mutableValue) {
-            this.mutableValue = [option]
-          } else if (this.multiple) {
-            this.mutableValue.push(option)
+          if (this.multiple) {
+              if (!this.mutableValue) {
+                  this.mutableValue = [option]
+              } else {
+                  this.mutableValue.push(option)
+              }
+              // this.lastSelectedIndex could be 0
+              if (this.lastSelectedIndex !== null && $event && $event.shiftKey) {
+                var firstIndex = this.lastSelectedIndex < index ? this.lastSelectedIndex + 1 : index + 1;
+                var lastIndex = this.lastSelectedIndex < index ? index : this.lastSelectedIndex;
+                var optionsToSet = this.filteredOptions.slice(firstIndex, lastIndex)
+                for (var i=0; i<optionsToSet.length; i++) {
+                    if (!this.mutableValue.includes(optionsToSet[i])) {
+                        this.mutableValue.push(optionsToSet[i])
+                    }
+                }
+              }
+              this.lastSelectedIndex = index;
           } else {
             this.mutableValue = option
           }
         }
 
-        this.onAfterSelect(option)
+        this.onAfterSelect(option, $event)
       },
 
       /**
@@ -650,9 +665,10 @@
        * @param  {Object|String} option
        * @return {void}
        */
-      onAfterSelect(option) {
-        if (this.closeOnSelect) {
+      onAfterSelect(option, $event) {
+        if (this.closeOnSelect && (!$event || !$event.ctrlKey)) {
           this.open = !this.open
+          this.lastSelectedIndex = null
           this.$refs.search.blur()
         }
 
@@ -806,7 +822,7 @@
        */
       clearSearchOnBlur() {
         return this.clearSearchOnSelect && !this.multiple
-      },  
+      },
 
       /**
        * Return the current state of the
@@ -846,14 +862,14 @@
        * @return {array}
        */
       filteredOptions() {
-        let options = this.mutableOptions.filter((option) => {
+        let options = this.mutableOptions ? this.mutableOptions.filter((option) => {
           if (typeof option === 'object' && option.hasOwnProperty(this.label)) {
             return option[this.label].toLowerCase().indexOf(this.search.toLowerCase()) > -1
           } else if (typeof option === 'object' && !option.hasOwnProperty(this.label)) {
             return console.warn(`[vue-select warn]: Label key "option.${this.label}" does not exist in options object.\nhttp://sagalbot.github.io/vue-select/#ex-labels`)
           }
           return option.toLowerCase().indexOf(this.search.toLowerCase()) > -1
-        })
+        }) : []
         if (this.taggable && this.search.length && !this.optionExists(this.search)) {
           options.unshift(this.search)
         }
