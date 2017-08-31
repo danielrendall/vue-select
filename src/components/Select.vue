@@ -527,6 +527,7 @@
         mutableValue: null,
         mutableOptions: [],
         lastSelectedIndex: null,
+        optionToIndexMap: {}
       }
     },
 
@@ -574,6 +575,7 @@
         if (!this.taggable && this.resetOnOptionsChange) {
 					this.mutableValue = this.multiple ? [] : null
         }
+        this.buildOptionToIndexMap()
       },
 
       /**
@@ -595,11 +597,27 @@
 			this.mutableValue = this.value
       this.mutableOptions = this.options.slice(0)
 			this.mutableLoading = this.loading
+        this.buildOptionToIndexMap()
 
       this.$on('option:created', this.maybePushTag)
     },
 
     methods: {
+
+      buildOptionToIndexMap() {
+        var tmp = {}
+        if (this.mutableOptions) {
+          for (var i = 0; i < this.mutableOptions.length; i++) {
+            var option = this.mutableOptions[i]
+            if (typeof option === 'object' && option[this.label]) {
+              tmp[option[this.label]] = i
+            } else {
+              tmp[option] = i
+            }
+          }
+        }
+          this.optionToIndexMap = tmp
+      },
 
       /**
        * Select a given option.
@@ -631,6 +649,12 @@
                     }
                 }
               }
+              var _this = this;
+              this.mutableValue.sort(function(a, b) {
+                 var keyA = (typeof a === 'object' && a[_this.label]) ? a[_this.label] : a
+                 var keyB = (typeof b === 'object' && b[_this.label]) ? b[_this.label] : b
+                 return _this.optionToIndexMap[keyA] - _this.optionToIndexMap[keyB]
+              });
               this.lastSelectedIndex = index;
           } else {
             this.mutableValue = option
